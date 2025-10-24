@@ -13,6 +13,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
 import warnings
+import yfinance as yf
 warnings.filterwarnings('ignore')
 
 # Language configuration
@@ -22,6 +23,9 @@ def get_translations(language):
             'title': "📈 Stock Price Prediction System - Saudi Trading",
             'sidebar_settings': "⚙️ Model Settings",
             'upload_file': "📤 Upload Stock Data File (CSV)",
+            'builtin_data': "📊 Built-in Saudi Stocks",
+            'select_stock': "Select Stock",
+            'select_period': "Select Historical Period",
             'training_params': "🎛️ Training Parameters",
             'time_window': "Time Window (days)",
             'test_ratio': "Test Ratio",
@@ -85,12 +89,19 @@ def get_translations(language):
             'future_forecast': "Future Forecast",
             'training_data': "Training Data",
             'actual_price': "Actual Price",
-            'predicted_price': "Predicted Price"
+            'predicted_price': "Predicted Price",
+            'learn_more': "📚 Learn More",
+            'fetching_data': "Fetching stock data...",
+            'data_loaded': "✅ Data loaded successfully!",
+            'data_source': "Data Source"
         },
         'arabic': {
             'title': "📈 نظام التنبؤ بأسعار الأسهم - تداول السعودية",
             'sidebar_settings': "⚙️ إعدادات النموذج",
             'upload_file': "📤 حمّل ملف بيانات الأسهم (CSV)",
+            'builtin_data': "📊 الأسهم السعودية المضمنة",
+            'select_stock': "اختر السهم",
+            'select_period': "اختر الفترة التاريخية",
             'training_params': "🎛️ معاملات التدريب",
             'time_window': "نافذة الزمن (أيام)",
             'test_ratio': "نسبة الاختبار",
@@ -154,10 +165,37 @@ def get_translations(language):
             'future_forecast': "التنبؤات المستقبلية",
             'training_data': "بيانات التدريب",
             'actual_price': "السعر الفعلي",
-            'predicted_price': "السعر المتوقع"
+            'predicted_price': "السعر المتوقع",
+            'learn_more': "📚 تعرف أكثر",
+            'fetching_data': "جاري جلب بيانات الأسهم...",
+            'data_loaded': "✅ تم تحميل البيانات بنجاح!",
+            'data_source': "مصدر البيانات"
         }
     }
     return translations[language]
+
+# Saudi stocks dictionary
+SAUDI_STOCKS = {
+    '2222.SR': 'Aramco (أرامكو)',
+    '1180.SR': 'Al Rajhi Bank (البنك الأهلي)',
+    '1010.SR': 'SABIC (سابك)',
+    '1150.SR': 'Alinma Bank (الإنما)',
+    '1211.SR': 'Saudi Basic Industries (المؤسسة العامة للصناعات الأساسية)',
+    '2010.SR': 'Saudi Basic Industries (سابك)',
+    '1120.SR': 'Al Rajhi (الراجحي)',
+    '2380.SR': 'Petro Rabigh (رابغ)',
+    '3030.SR': 'Saudi Electricity (الكهرباء)',
+    '2050.SR': 'Savola Group (صافولا)'
+}
+
+# Historical periods
+PERIODS = {
+    '3month': '3 Months',
+    '6month': '6 Months', 
+    '1year': '1 Year',
+    '2year': '2 Years',
+    '5year': '5 Years'
+}
 
 # تنسيق الصفحة
 st.set_page_config(
@@ -219,8 +257,54 @@ st.markdown("""
         right: 10px;
         z-index: 999;
     }
+    .learn-more-content {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+def fetch_stock_data(stock_symbol, period):
+    """Fetch stock data from Yahoo Finance and normalize it"""
+    try:
+        with st.spinner():
+            # Fetch data from Yahoo Finance
+            stock = yf.Ticker(stock_symbol)
+            hist_data = stock.history(period=period)
+            
+            if hist_data.empty:
+                st.error(f"No data found for {stock_symbol}")
+                return None
+            
+            # Reset index to get Date as column
+            hist_data = hist_data.reset_index()
+            
+            # Rename columns to match our expected format
+            hist_data = hist_data.rename(columns={
+                'Date': 'Date',
+                'Close': 'Price',
+                'Open': 'Open',
+                'High': 'High', 
+                'Low': 'Low',
+                'Volume': 'Vol.'
+            })
+            
+            # Calculate Change %
+            hist_data['Change %'] = hist_data['Price'].pct_change() * 100
+            
+            # Fill NaN values in Change % with 0
+            hist_data['Change %'] = hist_data['Change %'].fillna(0)
+            
+            # Ensure Date is in correct format
+            hist_data['Date'] = pd.to_datetime(hist_data['Date'])
+            
+            return hist_data
+            
+    except Exception as e:
+        st.error(f"Error fetching data: {str(e)}")
+        return None
 
 class StockPredictor:
     def __init__(self):
@@ -388,6 +472,10 @@ def create_performance_gauge(value, title, min_val, max_val):
     return fig
 
 def main():
+    # Initialize session state for learn more
+    if 'show_learn_more' not in st.session_state:
+        st.session_state.show_learn_more = False
+
     # Language selection
     col1, col2, col3 = st.columns([3, 1, 1])
     with col3:
@@ -403,8 +491,37 @@ def main():
     with st.sidebar:
         st.markdown(f"### {t['sidebar_settings']}")
         
-        # تحميل الملف / File upload
-        uploaded_file = st.file_uploader(t['upload_file'], type=['csv'])
+        # Data source selection
+        data_source = st.radio("Select Data Source", ["Upload CSV", "Built-in Saudi Stocks"])
+        
+        if data_source == "Upload CSV":
+            # تحميل الملف / File upload
+            uploaded_file = st.file_uploader(t['upload_file'], type=['csv'])
+            df_loaded = uploaded_file is not None
+        else:
+            # Built-in stocks selection
+            st.markdown(f"### {t['builtin_data']}")
+            selected_stock = st.selectbox(
+                t['select_stock'], 
+                options=list(SAUDI_STOCKS.keys()),
+                format_func=lambda x: f"{SAUDI_STOCKS[x]} ({x})"
+            )
+            selected_period = st.selectbox(
+                t['select_period'],
+                options=list(PERIODS.keys()),
+                format_func=lambda x: PERIODS[x]
+            )
+            
+            if st.button("Fetch Stock Data", use_container_width=True):
+                with st.spinner(t['fetching_data']):
+                    df = fetch_stock_data(selected_stock, selected_period)
+                    if df is not None:
+                        st.session_state.builtin_df = df
+                        st.session_state.selected_stock = selected_stock
+                        st.session_state.selected_period = selected_period
+                        st.success(t['data_loaded'])
+            
+            df_loaded = 'builtin_df' in st.session_state
         
         st.markdown("---")
         st.markdown(f"### {t['training_params']}")
@@ -426,13 +543,90 @@ def main():
         else:
             st.session_state.run_training = False
 
-    if uploaded_file is not None:
-        # تهيئة المتنبئ / Initialize predictor
+    # Learn More button
+    col1, col2, col3 = st.columns([2, 1, 2])
+    with col2:
+        if st.button(t['learn_more'], use_container_width=True):
+            st.session_state.show_learn_more = not st.session_state.show_learn_more
+
+    # Learn More content
+    if st.session_state.show_learn_more:
+        st.markdown('<div class="learn-more-content">', unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown(f"### {t['data_format']}")
+            st.markdown(f"{t['data_columns']}")
+            st.markdown(f"- **{t['date_col']}**")
+            st.markdown(f"- **{t['price_col']}**")
+            st.markdown(f"- **{t['open_col']}**")
+            st.markdown(f"- **{t['high_col']}**")
+            st.markdown(f"- **{t['low_col']}**")
+            st.markdown(f"- **{t['vol_col']}**")
+            st.markdown(f"- **{t['change_col']}**")
+            
+            # مثال على البيانات / Sample data
+            sample_data = pd.DataFrame({
+                'Date': ['01/01/2023', '01/02/2023', '01/03/2023'],
+                'Price': [0.3858, 0.4083, 0.4437],
+                'Open': [0.3806, 0.3870, 0.4096],
+                'High': [0.3589, 0.3717, 0.4006],
+                'Low': [0.3973, 0.3941, 0.4299],
+                'Vol.': [0.0474, 0.0728, 0.1252],
+                'Change %': [0.5222, 0.5759, 0.6275]
+            })
+            st.dataframe(sample_data, use_container_width=True)
+        
+        with col2:
+            st.markdown(f"### {t['features']}")
+            for feature in t['features_list']:
+                st.markdown(f"- **{feature}**")
+            
+            st.markdown(f"### {t['model_specs']}")
+            for spec in t['model_specs_list']:
+                st.markdown(f"- **{spec}**")
+        
+        # إحصائيات وهمية للعرض / Demo performance statistics
+        st.markdown(f"### {t['performance_stats']}")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(t['lstm_accuracy'], "94.2%", "1.2%")
+        with col2:
+            st.metric(t['mlp_accuracy'], "92.8%", "0.8%")
+        with col3:
+            st.metric(t['avg_r2'], "0.89", "0.03")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Main content area
+    if data_source == "Upload CSV" and uploaded_file is not None:
+        df_source = "uploaded"
         predictor = StockPredictor()
-        
-        # تحميل البيانات / Load data
         df = predictor.load_data(uploaded_file)
-        
+    elif data_source == "Built-in Saudi Stocks" and df_loaded:
+        df_source = "builtin"
+        df = st.session_state.builtin_df
+        predictor = StockPredictor()
+    else:
+        # Welcome message when no data is loaded
+        st.markdown(f"""
+        <div style='text-align: center; padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; color: white;'>
+            <h2>{t['welcome']}</h2>
+            <p style='font-size: 1.2rem;'>{t['welcome_desc']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+
+    # Display data overview and analysis
+    if df_loaded:
+        # Display data source info for built-in data
+        if df_source == "builtin":
+            stock_name = SAUDI_STOCKS[st.session_state.selected_stock]
+            period_name = PERIODS[st.session_state.selected_period]
+            st.info(f"📊 {t['data_source']}: {stock_name} | {t['select_period']}: {period_name}")
+
         # عرض نظرة عامة على البيانات / Data overview
         st.markdown(f'<h2 class="section-header">{t["data_overview"]}</h2>', unsafe_allow_html=True)
         
@@ -573,15 +767,12 @@ def main():
                 
                 # الحصول على آخر أيام نافذة الزمن / Get last time window days
                 last_time_window_days = df['Price'].values[-time_window:]
-                last_time_window_days_scaled = predictor.scaler.transform(
-                    last_time_window_days.reshape(-1, 1)
-                )
+                last_time_window_scaled = predictor.scaler.transform(last_time_window_days.reshape(-1, 1))
                 
-                # التنبؤ بـ 30 يوم القادمة / Predict next 30 days
                 future_predictions = []
-                current_batch = last_time_window_days_scaled.reshape(1, time_window, 1)
+                current_batch = last_time_window_scaled.reshape(1, time_window, 1)
                 
-                for i in range(30):
+                for i in range(30):  # التنبؤ لـ 30 يوم / Predict for 30 days
                     if model_type == 'LSTM':
                         current_pred = predictor.model.predict(current_batch, verbose=0)[0]
                     else:
@@ -590,34 +781,31 @@ def main():
                     
                     future_predictions.append(current_pred[0])
                     
-                    # تحديث الدفعة للتنبؤ التالي / Update batch for next prediction
-                    current_batch = np.append(
-                        current_batch[:, 1:, :], 
-                        [[[current_pred[0]]]], 
-                        axis=1
-                    )
+                    # تحديث الدفعة / Update batch
+                    current_batch = np.append(current_batch[:, 1:, :], [[current_pred]], axis=1)
                 
                 future_predictions = predictor.scaler.inverse_transform(
                     np.array(future_predictions).reshape(-1, 1)
                 )
                 
-                # إنشاء التواريخ المستقبلية / Create future dates
+                # إنشاء تواريخ مستقبلية / Create future dates
                 last_date = df['Date'].iloc[-1]
-                future_dates = pd.date_range(
-                    start=last_date + timedelta(days=1), 
-                    periods=30, 
-                    freq='D'
-                )
+                future_dates = [last_date + timedelta(days=i) for i in range(1, 31)]
                 
-                # رسم التنبؤات المستقبلية / Plot future predictions
+                # عرض التنبؤات المستقبلية / Display future predictions
+                future_df = pd.DataFrame({
+                    'Date': future_dates,
+                    'Predicted Price': future_predictions.flatten()
+                })
+                
                 fig_future = go.Figure()
                 fig_future.add_trace(go.Scatter(
-                    x=df['Date'][-100:], y=df['Price'][-100:],
+                    x=df['Date'], y=df['Price'],
                     name=t['historical_price'],
                     line=dict(color='blue', width=2)
                 ))
                 fig_future.add_trace(go.Scatter(
-                    x=future_dates, y=future_predictions.flatten(),
+                    x=future_df['Date'], y=future_df['Predicted Price'],
                     name=t['future_forecast'],
                     line=dict(color='red', width=2, dash='dash')
                 ))
@@ -632,85 +820,21 @@ def main():
                 
                 st.plotly_chart(fig_future, use_container_width=True)
                 
-                # تحميل التنبؤات / Download predictions
+                # عرض جدول التنبؤات / Display predictions table
+                st.dataframe(future_df, use_container_width=True)
+                
+                # زر تحميل النتائج / Download results button
                 st.markdown(f"### {t['download_results']}")
-                
-                # إنشاء بيانات للتحميل / Create data for download
-                date_col = 'Date' if language == 'english' else 'التاريخ'
-                price_col = 'Predicted_Price' if language == 'english' else 'السعر_المتوقع'
-                model_col = 'Model_Used' if language == 'english' else 'النموذج_المستخدم'
-                prediction_col = 'Prediction_Date' if language == 'english' else 'تاريخ_التنبؤ'
-                
-                future_df = pd.DataFrame({
-                    date_col: future_dates,
-                    price_col: future_predictions.flatten(),
-                    model_col: model_type,
-                    prediction_col: datetime.now().strftime("%Y-%m-%d")
-                })
-                
-                csv = future_df.to_csv(index=False, encoding='utf-8-sig')
+                csv = future_df.to_csv(index=False)
                 st.download_button(
                     label=t['download_button'],
                     data=csv,
-                    file_name=f"future_predictions_{model_type}_{datetime.now().strftime('%Y%m%d')}.csv",
-                    mime="text/csv"
+                    file_name=f"future_predictions_{model_type}.csv",
+                    mime="text/csv",
+                    type="primary"
                 )
                 
                 st.success(t['training_completed'])
-    
-    else:
-        # صفحة الترحيب / Welcome page
-        st.markdown(f"""
-        <div style='text-align: center; padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; color: white;'>
-            <h2>{t['welcome']}</h2>
-            <p style='font-size: 1.2rem;'>{t['welcome_desc']}</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown(f"### {t['data_format']}")
-            st.markdown(f"{t['data_columns']}")
-            st.markdown(f"- **{t['date_col']}**")
-            st.markdown(f"- **{t['price_col']}**")
-            st.markdown(f"- **{t['open_col']}**")
-            st.markdown(f"- **{t['high_col']}**")
-            st.markdown(f"- **{t['low_col']}**")
-            st.markdown(f"- **{t['vol_col']}**")
-            st.markdown(f"- **{t['change_col']}**")
-            
-            # مثال على البيانات / Sample data
-            sample_data = pd.DataFrame({
-                'Date': ['01/01/2023', '01/02/2023', '01/03/2023'],
-                'Price': [0.3858, 0.4083, 0.4437],
-                'Open': [0.3806, 0.3870, 0.4096],
-                'High': [0.3589, 0.3717, 0.4006],
-                'Low': [0.3973, 0.3941, 0.4299],
-                'Vol.': [0.0474, 0.0728, 0.1252],
-                'Change %': [0.5222, 0.5759, 0.6275]
-            })
-            st.dataframe(sample_data, use_container_width=True)
-        
-        with col2:
-            st.markdown(f"### {t['features']}")
-            for feature in t['features_list']:
-                st.markdown(f"- **{feature}**")
-            
-            st.markdown(f"### {t['model_specs']}")
-            for spec in t['model_specs_list']:
-                st.markdown(f"- **{spec}**")
-        
-        # إحصائيات وهمية للعرض / Demo performance statistics
-        st.markdown(f"### {t['performance_stats']}")
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric(t['lstm_accuracy'], "94.2%", "1.2%")
-        with col2:
-            st.metric(t['mlp_accuracy'], "92.8%", "0.8%")
-        with col3:
-            st.metric(t['avg_r2'], "0.89", "0.03")
 
 if __name__ == "__main__":
     main()
