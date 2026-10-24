@@ -6,4 +6,4 @@ plotly
 seaborn
 scikit-learn
 tensorflow-cpu
-yfinance
+yfinance>=1.0

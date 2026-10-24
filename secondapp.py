@@ -12,6 +12,7 @@ from tensorflow.keras.callbacks import EarlyStopping
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
+import time
 import warnings
 import yfinance as yf
 warnings.filterwarnings('ignore')
@@ -341,21 +342,28 @@ st.markdown("""
 
 @st.cache_data(ttl=900, show_spinner=False)
 def _download(symbol, period):
-    # raises on empty data so failures are never cached
-    hist = yf.Ticker(symbol).history(period=period)
-    if len(hist) < 10:
-        raise ValueError("no data")
-    return hist
+    # raises on empty data so failures are never cached; retries ride out Yahoo rate limits
+    for attempt in range(3):
+        try:
+            hist = yf.Ticker(symbol).history(period=period)
+            if len(hist) >= 10:
+                return hist
+            err = ValueError(f"Yahoo returned {len(hist)} rows")
+        except Exception as e:
+            err = e
+        time.sleep(2 * (attempt + 1))
+    raise err
 
 def fetch_stock_data(stock_symbol, period):
     """Fetch stock data from Yahoo Finance; returns None if unavailable (never fake data)"""
-    symbols = [stock_symbol]
-    if stock_symbol in ALTERNATIVE_SYMBOLS:
-        symbols.append(ALTERNATIVE_SYMBOLS[stock_symbol])
-    for sym in symbols:
+    err = None
+    for sym in [stock_symbol, ALTERNATIVE_SYMBOLS.get(stock_symbol)]:
+        if not sym:
+            continue
         try:
             hist_data = _download(sym, period)
-        except Exception:
+        except Exception as e:
+            err = e
             continue
         if sym != stock_symbol:
             st.info(f"Using alternative symbol: {sym}")
@@ -363,7 +371,8 @@ def fetch_stock_data(stock_symbol, period):
         hist_data['Date'] = pd.to_datetime(hist_data['Date']).dt.tz_localize(None)
         hist_data['Change %'] = hist_data['Price'].pct_change().fillna(0) * 100
         return hist_data
-    st.error(f"No real data available for {stock_symbol}. Try another symbol or period.")
+    st.error(f"No real data available for {stock_symbol} ({type(err).__name__}: {err}). "
+             "Yahoo may be rate-limiting this server; wait a minute and try again.")
     return None
 
 class StockPredictor:
