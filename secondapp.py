@@ -12,6 +12,7 @@ from tensorflow.keras.callbacks import EarlyStopping
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
+import os
 import time
 import warnings
 import yfinance as yf
@@ -253,8 +254,6 @@ SAUDI_STOCKS = {
     '4200.SR': 'Aldrees Petroleum (الدريس)'
 }
 
-ALTERNATIVE_SYMBOLS = {}
-
 # Historical periods
 PERIODS = {
     '3mo': '3 Months',
@@ -342,7 +341,7 @@ st.markdown("""
 @st.cache_data(ttl=900, show_spinner=False)
 def _download(symbol, period):
     # raises on empty data so failures are never cached; retries ride out Yahoo rate limits
-    for attempt in range(3):
+    for attempt in range(2):
         try:
             hist = yf.Ticker(symbol).history(period=period)
             if len(hist) >= 10:
@@ -350,29 +349,32 @@ def _download(symbol, period):
             err = ValueError(f"Yahoo returned {len(hist)} rows")
         except Exception as e:
             err = e
-        time.sleep(2 * (attempt + 1))
+        time.sleep(1)
     raise err
 
+PERIOD_DAYS = {'3mo': 92, '6mo': 183, '1y': 365, '2y': 730, '5y': 1826}
+
+def _snapshot(symbol, period):
+    """Bundled copy of the price history (data/<symbol>.csv, refreshed with update_data.py)"""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", f"{symbol}.csv")
+    hist = pd.read_csv(path, parse_dates=['Date'], index_col='Date')
+    return hist[hist.index >= hist.index[-1] - pd.Timedelta(days=PERIOD_DAYS[period])]
+
 def fetch_stock_data(stock_symbol, period):
-    """Fetch stock data from Yahoo Finance; returns None if unavailable (never fake data)"""
-    err = None
-    for sym in [stock_symbol, ALTERNATIVE_SYMBOLS.get(stock_symbol)]:
-        if not sym:
-            continue
+    """Real prices only: live from Yahoo, else the bundled snapshot (Yahoo blocks many cloud servers)"""
+    try:
+        hist_data = _download(stock_symbol, period)
+    except Exception as e:
         try:
-            hist_data = _download(sym, period)
-        except Exception as e:
-            err = e
-            continue
-        if sym != stock_symbol:
-            st.info(f"Using alternative symbol: {sym}")
-        hist_data = hist_data.reset_index().rename(columns={'Close': 'Price', 'Volume': 'Vol.'})
-        hist_data['Date'] = pd.to_datetime(hist_data['Date']).dt.tz_localize(None)
-        hist_data['Change %'] = hist_data['Price'].pct_change().fillna(0) * 100
-        return hist_data
-    st.error(f"No real data available for {stock_symbol} ({type(err).__name__}: {err}). "
-             "Yahoo may be rate-limiting this server; wait a minute and try again.")
-    return None
+            hist_data = _snapshot(stock_symbol, period)
+        except Exception:
+            st.error(f"No data available for {stock_symbol} ({type(e).__name__}: {e}).")
+            return None
+        st.info(f"Yahoo Finance is unreachable from this server; using saved prices up to {hist_data.index[-1].date()}.")
+    hist_data = hist_data.reset_index().rename(columns={'Close': 'Price', 'Volume': 'Vol.'})
+    hist_data['Date'] = pd.to_datetime(hist_data['Date']).dt.tz_localize(None)
+    hist_data['Change %'] = hist_data['Price'].pct_change().fillna(0) * 100
+    return hist_data
 
 class StockPredictor:
     def __init__(self):
