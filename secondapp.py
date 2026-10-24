@@ -21,43 +21,43 @@ warnings.filterwarnings('ignore')
 def get_translations(language):
     translations = {
         'english': {
-            'title': "📈 Stock Price Prediction System - Saudi Trading",
-            'sidebar_settings': "⚙️ Model Settings",
-            'upload_file': "📤 Upload Stock Data File (CSV)",
-            'builtin_data': "🔍 TASI Stock Search",
+            'title': "Stock Price Prediction System - Saudi Trading",
+            'sidebar_settings': "Model Settings",
+            'upload_file': "Upload Stock Data File (CSV)",
+            'builtin_data': "TASI Stock Search",
             'select_stock': "Select Stock",
             'select_period': "Select Historical Period",
-            'training_params': "🎛️ Training Parameters",
+            'training_params': "Training Parameters",
             'time_window': "Time Window (days)",
             'test_ratio': "Test Ratio",
             'epochs': "Number of Epochs",
             'batch_size': "Batch Size",
             'select_model': "Select Model",
-            'start_training': "🚀 Start Training",
-            'data_overview': "📊 Data Overview",
+            'start_training': "Start Training",
+            'data_overview': "Data Overview",
             'total_records': "Total Records",
             'time_period': "Time Period",
             'min_price': "Minimum Price",
             'max_price': "Maximum Price",
-            'tabs': ["📋 Data View", "📈 Charts", "🔍 Statistical Analysis"],
+            'tabs': ["Data View", "Charts", "Statistical Analysis"],
             'price_evolution': "Stock Price Evolution Over Time",
             'candlestick': "Candlestick Chart",
             'price_distribution': "Price Distribution",
             'descriptive_stats': "Descriptive Statistics",
-            'training_results': "🎯 Training and Prediction Results",
+            'training_results': "Training and Prediction Results",
             'training_model': "Training model...",
             'making_predictions': "Making predictions...",
             'completed': "Completed!",
-            'performance_metrics': "📊 Performance Metrics",
-            'training_loss': "📉 Training Loss Curve",
-            'actual_vs_predicted': "🔮 Actual vs Predicted Prices Comparison",
-            'future_predictions': "🔭 Future Predictions (30 days)",
-            'download_results': "📥 Download Results",
-            'download_button': "📥 Download Future Predictions (CSV)",
-            'training_completed': "✅ Training and prediction completed successfully!",
-            'welcome': "🚀 Welcome to Stock Price Prediction System",
+            'performance_metrics': "Performance Metrics",
+            'training_loss': "Training Loss Curve",
+            'actual_vs_predicted': "Actual vs Predicted Prices Comparison",
+            'future_predictions': "Future Predictions (30 days)",
+            'download_results': "Download Results",
+            'download_button': "Download Future Predictions (CSV)",
+            'training_completed': "Training and prediction completed successfully!",
+            'welcome': "Welcome to Stock Price Prediction System",
             'welcome_desc': "Intelligent stock price prediction system for Saudi stock market using AI technologies",
-            'data_format': "📋 Required Data Format",
+            'data_format': "Required Data Format",
             'data_columns': "CSV file should contain the following columns:",
             'date_col': "Date: Trading date",
             'price_col': "Price: Closing price",
@@ -66,7 +66,7 @@ def get_translations(language):
             'low_col': "Low: Lowest price",
             'vol_col': "Vol.: Trading volume",
             'change_col': "Change %: Change percentage",
-            'features': "🎯 System Features",
+            'features': "System Features",
             'features_list': [
                 "Deep Learning Models: LSTM and MLP as per project document",
                 "Trading Focus: Customized for Saudi stock market",
@@ -75,14 +75,14 @@ def get_translations(language):
                 "Future Predictions: 30-day price forecasts",
                 "Data Export: Download results for analysis"
             ],
-            'model_specs': "📊 Model Specifications",
+            'model_specs': "Model Specifications",
             'model_specs_list': [
                 "LSTM: Two layers with Dropout to prevent overfitting",
                 "MLP: With ReLU activation",
                 "Data Normalization: Min-Max scaling according to methodology",
                 "Time Series: Sliding window approach for sequence prediction"
             ],
-            'performance_stats': "📈 Model Performance Statistics",
+            'performance_stats': "Model Performance Statistics",
             'lstm_accuracy': "LSTM Accuracy",
             'mlp_accuracy': "MLP Accuracy",
             'avg_r2': "Average R²",
@@ -91,9 +91,9 @@ def get_translations(language):
             'training_data': "Training Data",
             'actual_price': "Actual Price",
             'predicted_price': "Predicted Price",
-            'learn_more': "📚 Learn More",
+            'learn_more': "Learn More",
             'fetching_data': "Fetching stock data...",
-            'data_loaded': "✅ Data loaded successfully!",
+            'data_loaded': "Data loaded successfully!",
             'data_source': "Data Source",
             'system_guide': "System Guide & How to Use",
             'guide_content': [
@@ -122,43 +122,43 @@ def get_translations(language):
             ]
         },
         'arabic': {
-            'title': "📈 نظام التنبؤ بأسعار الأسهم - تداول السعودية",
-            'sidebar_settings': "⚙️ إعدادات النموذج",
-            'upload_file': "📤 حمّل ملف بيانات الأسهم (CSV)",
-            'builtin_data': "🔍 البحث في مؤشر تاسي",
+            'title': "نظام التنبؤ بأسعار الأسهم - تداول السعودية",
+            'sidebar_settings': "إعدادات النموذج",
+            'upload_file': "حمّل ملف بيانات الأسهم (CSV)",
+            'builtin_data': "البحث في مؤشر تاسي",
             'select_stock': "اختر السهم",
             'select_period': "اختر الفترة التاريخية",
-            'training_params': "🎛️ معاملات التدريب",
+            'training_params': "معاملات التدريب",
             'time_window': "نافذة الزمن (أيام)",
             'test_ratio': "نسبة الاختبار",
             'epochs': "عدد الدورات",
             'batch_size': "حجم الدفعة",
             'select_model': "اختر النموذج",
-            'start_training': "🚀 ابدأ التدريب",
-            'data_overview': "📊 نظرة عامة على البيانات",
+            'start_training': "ابدأ التدريب",
+            'data_overview': "نظرة عامة على البيانات",
             'total_records': "إجمالي السجلات",
             'time_period': "الفترة الزمنية",
             'min_price': "أقل سعر",
             'max_price': "أعلى سعر",
-            'tabs': ["📋 عرض البيانات", "📈 الرسوم البيانية", "🔍 التحليل الإحصائي"],
+            'tabs': ["عرض البيانات", "الرسوم البيانية", "التحليل الإحصائي"],
             'price_evolution': "تطور سعر السهم مع الوقت",
             'candlestick': "الرسم البياني للشموع اليابانية",
             'price_distribution': "توزيع الأسعار",
             'descriptive_stats': "الإحصائيات الوصفية",
-            'training_results': "🎯 نتائج التدريب والتنبؤ",
+            'training_results': "نتائج التدريب والتنبؤ",
             'training_model': "جاري تدريب النموذج...",
             'making_predictions': "جاري إجراء التنبؤات...",
             'completed': "اكتمل!",
-            'performance_metrics': "📊 مقاييس الأداء",
-            'training_loss': "📉 منحنى فقدان التدريب",
-            'actual_vs_predicted': "🔮 المقارنة بين الأسعار الفعلية والمتوقعة",
-            'future_predictions': "🔭 التنبؤات المستقبلية (30 يوم)",
-            'download_results': "📥 تحميل النتائج",
-            'download_button': "📥 حمّل التنبؤات المستقبلية (CSV)",
-            'training_completed': "✅ اكتمل التدريب والتنبؤ بنجاح!",
-            'welcome': "🚀 مرحباً بك في نظام التنبؤ بأسعار الأسهم",
+            'performance_metrics': "مقاييس الأداء",
+            'training_loss': "منحنى فقدان التدريب",
+            'actual_vs_predicted': "المقارنة بين الأسعار الفعلية والمتوقعة",
+            'future_predictions': "التنبؤات المستقبلية (30 يوم)",
+            'download_results': "تحميل النتائج",
+            'download_button': "حمّل التنبؤات المستقبلية (CSV)",
+            'training_completed': "اكتمل التدريب والتنبؤ بنجاح!",
+            'welcome': "مرحباً بك في نظام التنبؤ بأسعار الأسهم",
             'welcome_desc': "نظام ذكي للتنبؤ بأسعار الأسهم في سوق تداول السعودي باستخدام تقنيات الذكاء الاصطناعي",
-            'data_format': "📋 تنسيق البيانات المطلوب",
+            'data_format': "تنسيق البيانات المطلوب",
             'data_columns': "يجب أن يحتوي ملف CSV على الأعمدة التالية:",
             'date_col': "Date: تاريخ التداول",
             'price_col': "Price: سعر الإغلاق",
@@ -167,7 +167,7 @@ def get_translations(language):
             'low_col': "Low: أقل سعر",
             'vol_col': "Vol.: حجم التداول",
             'change_col': "Change %: نسبة التغير",
-            'features': "🎯 ميزات النظام",
+            'features': "ميزات النظام",
             'features_list': [
                 "نماذج التعلم العميق: LSTM و MLP كما في وثيقة المشروع",
                 "تركيز على تداول: مخصص لسوق الأسهم السعودي",
@@ -176,14 +176,14 @@ def get_translations(language):
                 "تنبؤات مستقبلية: تنبؤ بأسعار 30 يوم القادمة",
                 "تصدير البيانات: تحميل النتائج للتحليل"
             ],
-            'model_specs': "📊 مواصفات النماذج",
+            'model_specs': "مواصفات النماذج",
             'model_specs_list': [
                 "LSTM: طبقتان مع Dropout لمنع الإفراط في التمرين",
                 "MLP: مع تنشيط ReLU",
                 "تطبيع البيانات: تحجيم Min-Max حسب المنهجية",
                 "السلاسل الزمنية: نهج النافذة المنزلقة للتنبؤ بالتسلسل"
             ],
-            'performance_stats': "📈 إحصائيات أداء النماذج",
+            'performance_stats': "إحصائيات أداء النماذج",
             'lstm_accuracy': "دقة LSTM",
             'mlp_accuracy': "دقة MLP",
             'avg_r2': "متوسط R²",
@@ -192,9 +192,9 @@ def get_translations(language):
             'training_data': "بيانات التدريب",
             'actual_price': "السعر الفعلي",
             'predicted_price': "السعر المتوقع",
-            'learn_more': "📚 تعرف أكثر",
+            'learn_more': "تعرف أكثر",
             'fetching_data': "جاري جلب بيانات الأسهم...",
-            'data_loaded': "✅ تم تحميل البيانات بنجاح!",
+            'data_loaded': "تم تحميل البيانات بنجاح!",
             'data_source': "مصدر البيانات",
             'system_guide': "دليل النظام وكيفية الاستخدام",
             'guide_content': [
@@ -267,7 +267,6 @@ PERIODS = {
 # تنسيق الصفحة
 st.set_page_config(
     page_title="نظام التنبؤ بأسعار الأسهم - تداول",
-    page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -537,7 +536,7 @@ def main():
     # Language selection
     col1, col2, col3 = st.columns([3, 1, 1])
     with col3:
-        language = st.selectbox("🌐 Language / اللغة", ["english", "arabic"])
+        language = st.selectbox("Language / اللغة", ["english", "arabic"])
     
     # Get translations
     t = get_translations(language)
@@ -662,7 +661,7 @@ def main():
         <div style='text-align: center; padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; color: white;'>
             <h2>{t['welcome']}</h2>
             <p style='font-size: 1.2rem;'>{t['welcome_desc']}</p>
-            <p style='font-size: 1rem; margin-top: 1rem;'>📊 Select a data source from the sidebar to get started</p>
+            <p style='font-size: 1rem; margin-top: 1rem;'>Select a data source from the sidebar to get started</p>
         </div>
         """, unsafe_allow_html=True)
         return
@@ -673,7 +672,7 @@ def main():
         if df_source == "builtin":
             stock_name = SAUDI_STOCKS[st.session_state.selected_stock]
             period_name = PERIODS[st.session_state.selected_period]
-            st.info(f"📊 {t['data_source']}: {stock_name} | {t['select_period']}: {period_name}")
+            st.info(f"{t['data_source']}: {stock_name} | {t['select_period']}: {period_name}")
 
         # عرض نظرة عامة على البيانات / Data overview
         st.markdown(f'<h2 class="section-header">{t["data_overview"]}</h2>', unsafe_allow_html=True)
