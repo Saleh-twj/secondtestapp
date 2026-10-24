@@ -478,7 +478,7 @@ def create_candlestick_chart(df, lang):
     """إنشاء رسم الشموع اليابانية / Create candlestick chart"""
     title = "Candlestick Chart" if lang == 'english' else "الرسم البياني للشموع اليابانية"
     x_title = "Date" if lang == 'english' else "التاريخ"
-    y_title = "Price" if lang == 'english' else "السعر"
+    y_title = "Price (SAR)" if lang == 'english' else "السعر (ريال)"
     
     fig = go.Figure(data=[go.Candlestick(
         x=df['Date'],
@@ -535,18 +535,6 @@ def main():
     
     # رأس الصفحة الرئيسي / Main header
     st.markdown(f'<h1 class="main-header">{t["title"]}</h1>', unsafe_allow_html=True)
-    
-    # Performance Statistics (Outside Learn More)
-    st.markdown(f'<div class="performance-stats">', unsafe_allow_html=True)
-    st.markdown(f"### {t['performance_stats']}")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric(t['lstm_accuracy'], "94.2%", "1.2%")
-    with col2:
-        st.metric(t['mlp_accuracy'], "92.8%", "0.8%")
-    with col3:
-        st.metric(t['avg_r2'], "0.89", "0.03")
-    st.markdown('</div>', unsafe_allow_html=True)
     
     # Learn More button
     col1, col2, col3 = st.columns([2, 1, 2])
@@ -687,9 +675,9 @@ def main():
         with col2:
             st.metric(t['time_period'], f"{df['Date'].min().date()} to {df['Date'].max().date()}")
         with col3:
-            st.metric(t['min_price'], f"${df['Price'].min():.2f}")
+            st.metric(t['min_price'], f"{df['Price'].min():.2f} SAR")
         with col4:
-            st.metric(t['max_price'], f"${df['Price'].max():.2f}")
+            st.metric(t['max_price'], f"{df['Price'].max():.2f} SAR")
         
         # علامات تبويب للعروض المختلفة / Tabs for different views
         tab1, tab2, tab3 = st.tabs(t['tabs'])
@@ -701,7 +689,7 @@ def main():
             col1, col2 = st.columns(2)
             with col1:
                 # رسم بياني للأسعار / Price chart
-                fig1 = px.line(df, x='Date', y='Price', title=t['price_evolution'])
+                fig1 = px.line(df, x='Date', y='Price', title=t['price_evolution'], labels={'Price': 'Price (SAR)' if language == 'english' else 'السعر (ريال)'})
                 fig1.update_layout(height=400)
                 st.plotly_chart(fig1, use_container_width=True)
             
@@ -714,7 +702,7 @@ def main():
             col1, col2 = st.columns(2)
             with col1:
                 # توزيع الأسعار / Price distribution
-                fig_hist = px.histogram(df, x='Price', title=t['price_distribution'])
+                fig_hist = px.histogram(df, x='Price', title=t['price_distribution'], labels={'Price': 'Price (SAR)'})
                 st.plotly_chart(fig_hist, use_container_width=True)
             
             with col2:
@@ -762,7 +750,7 @@ def main():
                 
                 # عرض النتائج / Display results
                 st.markdown(f"### {t['performance_metrics']}")
-                st.caption(f"Naive baseline RMSE (tomorrow = today): {naive_rmse:.3f} · model RMSE: {rmse:.3f} · "
+                st.caption(f"Naive baseline RMSE (tomorrow = today): {naive_rmse:.3f} SAR · model RMSE: {rmse:.3f} SAR · "
                            f"direction accuracy: {hit:.1f}% (50% = coin flip)")
                 if rmse >= naive_rmse:
                     st.warning("The model does not beat the naive baseline on this stock/period. Do not rely on it.")
@@ -817,7 +805,7 @@ def main():
                 fig_comparison.update_layout(
                     title=f'{t["actual_vs_predicted"]} - {model_type}',
                     xaxis_title='Date' if language == 'english' else 'التاريخ',
-                    yaxis_title='Price' if language == 'english' else 'السعر',
+                    yaxis_title='Price (SAR)' if language == 'english' else 'السعر (ريال)',
                     height=500,
                     template='plotly_white'
                 )
@@ -879,7 +867,7 @@ def main():
                 fig_future.update_layout(
                     title=t['future_predictions'],
                     xaxis_title='Date' if language == 'english' else 'التاريخ',
-                    yaxis_title='Price' if language == 'english' else 'السعر',
+                    yaxis_title='Price (SAR)' if language == 'english' else 'السعر (ريال)',
                     height=500,
                     template='plotly_white'
                 )
@@ -887,7 +875,7 @@ def main():
                 st.plotly_chart(fig_future, use_container_width=True)
                 
                 # عرض جدول التنبؤات / Display predictions table
-                st.dataframe(future_df, use_container_width=True)
+                st.dataframe(future_df, use_container_width=True, column_config={c: st.column_config.NumberColumn(format="%.2f SAR") for c in ['Predicted Price', 'Low (80%)', 'High (80%)']})
                 
                 # زر تحميل النتائج / Download results button
                 st.markdown(f"### {t['download_results']}")
