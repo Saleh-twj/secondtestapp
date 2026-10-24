@@ -8,6 +8,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM, Dropout
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
@@ -223,38 +224,35 @@ def get_translations(language):
     }
     return translations[language]
 
-# Saudi stocks dictionary with multiple data sources
+# TASI stocks (names verified against Yahoo Finance)
 SAUDI_STOCKS = {
     '2222.SR': 'Aramco (أرامكو)',
-    '1180.SR': 'Al Rajhi Bank (البنك الأهلي)',
-    '1010.SR': 'SABIC (سابك)',
-    '1150.SR': 'Alinma Bank (الإنما)',
-    '1211.SR': 'Saudi Basic Industries (المؤسسة العامة للصناعات الأساسية)',
-    '2010.SR': 'Saudi Basic Industries (سابك)',
-    '1120.SR': 'Al Rajhi (الراجحي)',
-    '2380.SR': 'Petro Rabigh (رابغ)',
-    '3030.SR': 'Saudi Electricity (الكهرباء)',
+    '1120.SR': 'Al Rajhi Bank (الراجحي)',
+    '1180.SR': 'Saudi National Bank (الأهلي)',
+    '1150.SR': 'Alinma Bank (الإنماء)',
+    '1010.SR': 'Riyad Bank (بنك الرياض)',
+    '1140.SR': 'Bank Albilad (البلاد)',
+    '1050.SR': 'Banque Saudi Fransi (السعودي الفرنسي)',
+    '1060.SR': 'Saudi Awwal Bank (الأول)',
+    '2010.SR': 'SABIC (سابك)',
+    '2020.SR': 'SABIC Agri-Nutrients (سابك للمغذيات)',
+    '1211.SR': 'Maaden (معادن)',
+    '7010.SR': 'stc (الاتصالات السعودية)',
+    '5110.SR': 'Saudi Energy (السعودية للطاقة)',
+    '2082.SR': 'ACWA Power (أكوا باور)',
+    '2280.SR': 'Almarai (المراعي)',
     '2050.SR': 'Savola Group (صافولا)',
-    '1060.SR': 'Saudi Arabian Fertilizer (سافكو)',
-    '4200.SR': 'Al-Dawaa Medical (الدواء)',
-    '4030.SR': 'National Shipping (الشحن)',
     '2350.SR': 'Saudi Kayan (كيان)',
-    '3020.SR': 'Yamama Cement (اليمامة)'
+    '2380.SR': 'Petro Rabigh (رابغ)',
+    '3030.SR': 'Saudi Cement (الأسمنت السعودية)',
+    '3020.SR': 'Yamama Cement (اليمامة)',
+    '4030.SR': 'Bahri (البحري)',
+    '4002.SR': 'Mouwasat Medical (المواساة)',
+    '4163.SR': 'Al-Dawaa Medical (الدواء)',
+    '4200.SR': 'Aldrees Petroleum (الدريس)'
 }
 
-# Alternative symbols in case primary ones fail
-ALTERNATIVE_SYMBOLS = {
-    '2222.SR': 'ARAMCO.AB',
-    '1180.SR': '1120.SR',
-    '1010.SR': '2010.SR',
-    '1150.SR': '1150.SE',
-    '1211.SR': '1211.SE',
-    '2010.SR': 'SABIC.AB',
-    '1120.SR': '1120.SE',
-    '2380.SR': '2380.SE',
-    '3030.SR': '3030.SE',
-    '2050.SR': '2050.SE'
-}
+ALTERNATIVE_SYMBOLS = {}
 
 # Historical periods
 PERIODS = {
@@ -382,42 +380,23 @@ class StockPredictor:
         return df
     
     def prepare_data(self, df, time_window=60, test_ratio=0.2):
-        """تحضير البيانات للتدريب / Prepare data for training"""
-        # استخدام عمود 'Price' كهدف / Use 'Price' column as target
-        prices = df['Price'].values.reshape(-1, 1)
+        """Windows of daily log-returns -> next-day log-return (price levels are non-stationary)"""
+        prices = df['Price'].values
+        rets = np.diff(np.log(prices)).reshape(-1, 1)  # rets[i] = return into prices[i+1]
+        split = int(len(prices) * (1 - test_ratio))    # first test price index
+        self.scaler.fit(rets[:split - 1])              # train returns only
+        scaled = self.scaler.transform(rets)
         
-        # تطبيع البيانات / Normalize data
-        training_data_len = int(len(prices) * (1 - test_ratio))
-        # fit scaler on train split only to avoid test leakage
-        self.scaler.fit(prices[:training_data_len])
-        scaled_data = self.scaler.transform(prices)
+        def windows(lo, hi):  # targets are price indices lo..hi-1
+            x = np.array([scaled[i - time_window:i, 0] for i in range(lo - 1, hi - 1)])
+            return x.reshape(len(x), time_window, 1)
         
-        # إنشاء مجموعة بيانات التدريب / Create training dataset
-        train_data = scaled_data[0:training_data_len, :]
-        
-        # تقسيم إلى x_train و y_train / Split into x_train and y_train
-        x_train = []
-        y_train = []
-        
-        for i in range(time_window, len(train_data)):
-            x_train.append(train_data[i-time_window:i, 0])
-            y_train.append(train_data[i, 0])
-        
-        x_train, y_train = np.array(x_train), np.array(y_train)
-        x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
-        
-        # إنشاء مجموعة بيانات الاختبار / Create test dataset
-        test_data = scaled_data[training_data_len - time_window:, :]
-        x_test = []
-        y_test = prices[training_data_len:, :]
-        
-        for i in range(time_window, len(test_data)):
-            x_test.append(test_data[i-time_window:i, 0])
-        
-        x_test = np.array(x_test)
-        x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))
-        
-        return x_train, y_train, x_test, y_test, training_data_len
+        x_train = windows(time_window + 1, split)
+        y_train = scaled[time_window:split - 1, 0]
+        x_test = windows(split, len(prices))
+        self.prev_prices = prices[split - 1:-1]        # yesterday's actual price per test day
+        y_test = prices[split:].reshape(-1, 1)
+        return x_train, y_train, x_test, y_test, split
     
     def build_lstm_model(self, time_window, lstm_units=50, dropout_rate=0.2):
         """بناء نموذج LSTM / Build LSTM model"""
@@ -451,13 +430,14 @@ class StockPredictor:
                    epochs=20, batch_size=32, time_window=60):
         """تدريب النموذج المختار / Train selected model"""
         self.model_type = model_type
+        es = EarlyStopping(patience=5, restore_best_weights=True)
         
         if model_type == 'LSTM':
             self.model = self.build_lstm_model(time_window)
             history = self.model.fit(x_train, y_train, 
                                    batch_size=batch_size, 
                                    epochs=epochs,
-                                   verbose=0)
+                                   verbose=0, validation_split=0.1, callbacks=[es])
         else:  # MLP
             # إعادة تشكيل البيانات لـ MLP / Reshape data for MLP
             x_train_mlp = x_train.reshape(x_train.shape[0], x_train.shape[1])
@@ -465,7 +445,7 @@ class StockPredictor:
             history = self.model.fit(x_train_mlp, y_train, 
                                    batch_size=batch_size, 
                                    epochs=epochs,
-                                   verbose=0)
+                                   verbose=0, validation_split=0.1, callbacks=[es])
         
         return history
     
@@ -477,8 +457,8 @@ class StockPredictor:
             x_test_mlp = x_test.reshape(x_test.shape[0], x_test.shape[1])
             predictions = self.model.predict(x_test_mlp, verbose=0)
         
-        predictions = self.scaler.inverse_transform(predictions)
-        return predictions
+        rets = self.scaler.inverse_transform(predictions)
+        return self.prev_prices.reshape(-1, 1) * np.exp(rets)
     
     def calculate_metrics(self, y_true, y_pred):
         """حساب مقاييس الأداء / Calculate performance metrics"""
@@ -486,6 +466,13 @@ class StockPredictor:
         rmse = np.sqrt(mse)
         r2 = r2_score(y_true, y_pred)
         return mse, rmse, r2
+    
+    def baseline_and_direction(self, y_true, y_pred):
+        """RMSE of the naive 'tomorrow = today' forecast, and % of days the up/down direction was right"""
+        prev = self.prev_prices.reshape(-1, 1)
+        naive_rmse = np.sqrt(mean_squared_error(y_true, prev))
+        hit = np.mean(np.sign(y_true - prev) == np.sign(y_pred - prev)) * 100
+        return naive_rmse, hit
 
 def create_candlestick_chart(df, lang):
     """إنشاء رسم الشموع اليابانية / Create candlestick chart"""
@@ -739,6 +726,11 @@ def main():
         if st.session_state.run_training:
             st.markdown(f'<h2 class="section-header">{t["training_results"]}</h2>', unsafe_allow_html=True)
             
+            if len(df) * (1 - test_ratio) < time_window + 30 or len(df) * test_ratio < 5:
+                st.error(f"Not enough data ({len(df)} rows) for a {time_window}-day window. "
+                         "Pick a longer period (1y+) or a smaller time window.")
+                return
+            
             with st.spinner(t['training_model']):
                 # تحضير البيانات / Prepare data
                 x_train, y_train, x_test, y_test, training_data_len = predictor.prepare_data(
@@ -766,8 +758,14 @@ def main():
                 progress_bar.progress(100)
                 status_text.text(t['completed'])
                 
+                naive_rmse, hit = predictor.baseline_and_direction(y_test, predictions)
+                
                 # عرض النتائج / Display results
                 st.markdown(f"### {t['performance_metrics']}")
+                st.caption(f"Naive baseline RMSE (tomorrow = today): {naive_rmse:.3f} · model RMSE: {rmse:.3f} · "
+                           f"direction accuracy: {hit:.1f}% (50% = coin flip)")
+                if rmse >= naive_rmse:
+                    st.warning("The model does not beat the naive baseline on this stock/period. Do not rely on it.")
                 
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -829,37 +827,29 @@ def main():
                 # التنبؤات المستقبلية / Future predictions
                 st.markdown(f"### {t['future_predictions']}")
                 
-                # الحصول على آخر أيام نافذة الزمن / Get last time window days
-                last_time_window_days = df['Price'].values[-time_window:]
-                last_time_window_scaled = predictor.scaler.transform(last_time_window_days.reshape(-1, 1))
+                # Recursive 30-day forecast on returns, compounded from the last price
+                last_rets = np.diff(np.log(df['Price'].values))[-time_window:]
+                current_batch = predictor.scaler.transform(last_rets.reshape(-1, 1)).reshape(1, time_window, 1)
                 
-                future_predictions = []
-                current_batch = last_time_window_scaled.reshape(1, time_window, 1)
-                
+                future_scaled = []
                 for i in range(30):  # التنبؤ لـ 30 يوم / Predict for 30 days
-                    if model_type == 'LSTM':
-                        current_pred = predictor.model.predict(current_batch, verbose=0)[0]
-                    else:
-                        current_batch_mlp = current_batch.reshape(1, time_window)
-                        current_pred = predictor.model.predict(current_batch_mlp, verbose=0)[0]
-                    
-                    future_predictions.append(current_pred[0])
-                    
-                    # تحديث الدفعة / Update batch
+                    inp = current_batch if model_type == 'LSTM' else current_batch.reshape(1, time_window)
+                    current_pred = predictor.model.predict(inp, verbose=0)[0]
+                    future_scaled.append(current_pred[0])
                     current_batch = np.append(current_batch[:, 1:, :], [[current_pred]], axis=1)
                 
-                future_predictions = predictor.scaler.inverse_transform(
-                    np.array(future_predictions).reshape(-1, 1)
-                )
+                future_rets = predictor.scaler.inverse_transform(np.array(future_scaled).reshape(-1, 1))
+                future_predictions = df['Price'].values[-1] * np.exp(np.cumsum(future_rets))
+                st.caption("Long-horizon forecasts drift toward the average trend; treat as an indication, not advice.")
                 
                 # إنشاء تواريخ مستقبلية / Create future dates
                 last_date = df['Date'].iloc[-1]
-                future_dates = [last_date + timedelta(days=i) for i in range(1, 31)]
+                future_dates = pd.bdate_range(last_date + timedelta(days=1), periods=30, freq='C', weekmask='Sun Mon Tue Wed Thu')  # Tadawul trades Sun-Thu
                 
                 # عرض التنبؤات المستقبلية / Display future predictions
                 future_df = pd.DataFrame({
                     'Date': future_dates,
-                    'Predicted Price': future_predictions.flatten()
+                    'Predicted Price': future_predictions
                 })
                 
                 fig_future = go.Figure()
