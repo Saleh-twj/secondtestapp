@@ -5,5 +5,5 @@ matplotlib
 plotly
 seaborn
 scikit-learn
-tensorflow
+tensorflow-cpu
 yfinance

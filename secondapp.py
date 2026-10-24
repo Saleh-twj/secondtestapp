@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error, r2_score
-import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM, Dropout
 from tensorflow.keras.optimizers import Adam
@@ -14,8 +13,6 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import warnings
 import yfinance as yf
-import requests
-from bs4 import BeautifulSoup
 warnings.filterwarnings('ignore')
 
 # Language configuration
@@ -344,148 +341,32 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+@st.cache_data(ttl=900, show_spinner=False)
+def _download(symbol, period):
+    # raises on empty data so failures are never cached
+    hist = yf.Ticker(symbol).history(period=period)
+    if len(hist) < 10:
+        raise ValueError("no data")
+    return hist
+
 def fetch_stock_data(stock_symbol, period):
-    """Fetch stock data from Yahoo Finance with fallback options"""
-    try:
-        # Try primary symbol first
-        stock = yf.Ticker(stock_symbol)
-        hist_data = stock.history(period=period)
-        
-        if hist_data.empty or len(hist_data) < 10:
-            # Try alternative symbol if primary fails
-            if stock_symbol in ALTERNATIVE_SYMBOLS:
-                alt_symbol = ALTERNATIVE_SYMBOLS[stock_symbol]
-                stock = yf.Ticker(alt_symbol)
-                hist_data = stock.history(period=period)
-                st.info(f"Using alternative symbol: {alt_symbol}")
-        
-        if hist_data.empty or len(hist_data) < 10:
-            # Generate synthetic data as final fallback
-            st.warning("Limited real data available. Generating enhanced synthetic data for demonstration.")
-            return generate_synthetic_data(period, stock_symbol)
-        
-        # Reset index to get Date as column
-        hist_data = hist_data.reset_index()
-        
-        # Rename columns to match our expected format
-        hist_data = hist_data.rename(columns={
-            'Date': 'Date',
-            'Close': 'Price',
-            'Open': 'Open',
-            'High': 'High', 
-            'Low': 'Low',
-            'Volume': 'Vol.'
-        })
-        
-        # Calculate Change %
-        hist_data['Change %'] = hist_data['Price'].pct_change() * 100
-        
-        # Fill NaN values in Change % with 0
-        hist_data['Change %'] = hist_data['Change %'].fillna(0)
-        
-        # Ensure Date is in correct format
-        hist_data['Date'] = pd.to_datetime(hist_data['Date'])
-        
-        # Ensure we have enough data points
-        if len(hist_data) < 50:
-            st.info("Enhancing dataset with additional data points for better model training.")
-            enhanced_data = enhance_dataset(hist_data)
-            return enhanced_data
-        
+    """Fetch stock data from Yahoo Finance; returns None if unavailable (never fake data)"""
+    symbols = [stock_symbol]
+    if stock_symbol in ALTERNATIVE_SYMBOLS:
+        symbols.append(ALTERNATIVE_SYMBOLS[stock_symbol])
+    for sym in symbols:
+        try:
+            hist_data = _download(sym, period)
+        except Exception:
+            continue
+        if sym != stock_symbol:
+            st.info(f"Using alternative symbol: {sym}")
+        hist_data = hist_data.reset_index().rename(columns={'Close': 'Price', 'Volume': 'Vol.'})
+        hist_data['Date'] = pd.to_datetime(hist_data['Date']).dt.tz_localize(None)
+        hist_data['Change %'] = hist_data['Price'].pct_change().fillna(0) * 100
         return hist_data
-        
-    except Exception as e:
-        st.error(f"Error fetching data: {str(e)}. Generating synthetic data for demonstration.")
-        return generate_synthetic_data(period, stock_symbol)
-
-def generate_synthetic_data(period, stock_symbol):
-    """Generate realistic synthetic stock data"""
-    # Determine number of days based on period
-    period_days = {
-        '3mo': 90,
-        '6mo': 180,
-        '1y': 365,
-        '2y': 730,
-        '5y': 1825
-    }
-    
-    days = period_days.get(period, 365)
-    
-    # Generate dates
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=days)
-    dates = pd.date_range(start=start_date, end=end_date, freq='D')
-    
-    # Generate realistic price data with trends and volatility
-    np.random.seed(42)  # For reproducibility
-    
-    # Base price (realistic range for Saudi stocks)
-    base_price = np.random.uniform(50, 200)
-    
-    # Generate price series with random walk
-    prices = [base_price]
-    for i in range(1, len(dates)):
-        # Random walk with slight upward trend
-        change = np.random.normal(0.001, 0.02)  # Small daily changes
-        new_price = prices[-1] * (1 + change)
-        prices.append(new_price)
-    
-    prices = np.array(prices)
-    
-    # Generate OHLC data
-    opens = prices * (1 + np.random.normal(0, 0.01, len(prices)))
-    highs = np.maximum(opens, prices) * (1 + np.random.uniform(0, 0.02, len(prices)))
-    lows = np.minimum(opens, prices) * (1 - np.random.uniform(0, 0.02, len(prices)))
-    
-    # Generate volume data
-    volumes = np.random.uniform(1000000, 10000000, len(prices))
-    
-    # Create DataFrame
-    df = pd.DataFrame({
-        'Date': dates,
-        'Price': prices,
-        'Open': opens,
-        'High': highs,
-        'Low': lows,
-        'Vol.': volumes
-    })
-    
-    # Calculate Change %
-    df['Change %'] = df['Price'].pct_change() * 100
-    df['Change %'] = df['Change %'].fillna(0)
-    
-    return df
-
-def enhance_dataset(original_df):
-    """Enhance dataset with additional data points if needed"""
-    if len(original_df) >= 100:
-        return original_df
-    
-    # Create enhanced dataset by interpolating and adding noise
-    enhanced_dates = pd.date_range(
-        start=original_df['Date'].min(),
-        end=original_df['Date'].max(),
-        freq='D'
-    )
-    
-    enhanced_df = pd.DataFrame({'Date': enhanced_dates})
-    
-    # Merge with original data and interpolate
-    for column in ['Price', 'Open', 'High', 'Low', 'Vol.']:
-        if column in original_df.columns:
-            temp_df = pd.merge(enhanced_df, original_df[['Date', column]], on='Date', how='left')
-            temp_df[column] = temp_df[column].interpolate(method='linear')
-            # Add small random noise to make it more realistic
-            if column != 'Vol.':
-                noise = np.random.normal(0, temp_df[column].std() * 0.01, len(temp_df))
-                temp_df[column] = temp_df[column] + noise
-            enhanced_df[column] = temp_df[column]
-    
-    # Calculate Change %
-    enhanced_df['Change %'] = enhanced_df['Price'].pct_change() * 100
-    enhanced_df['Change %'] = enhanced_df['Change %'].fillna(0)
-    
-    return enhanced_df
+    st.error(f"No real data available for {stock_symbol}. Try another symbol or period.")
+    return None
 
 class StockPredictor:
     def __init__(self):
@@ -506,10 +387,10 @@ class StockPredictor:
         prices = df['Price'].values.reshape(-1, 1)
         
         # تطبيع البيانات / Normalize data
-        scaled_data = self.scaler.fit_transform(prices)
-        
-        # إنشاء بيانات التدريب والاختبار / Create training and test data
-        training_data_len = int(len(scaled_data) * (1 - test_ratio))
+        training_data_len = int(len(prices) * (1 - test_ratio))
+        # fit scaler on train split only to avoid test leakage
+        self.scaler.fit(prices[:training_data_len])
+        scaled_data = self.scaler.transform(prices)
         
         # إنشاء مجموعة بيانات التدريب / Create training dataset
         train_data = scaled_data[0:training_data_len, :]
